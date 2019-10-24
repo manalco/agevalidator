@@ -1,0 +1,33 @@
+<?php 
+    function agevalidator_schema(){
+        $schema['agevalidator_log'] = array(
+            'description' => 'The table for storing the logs.',
+            'fields' => array(
+                'id' => array(
+                    'type' => 'serial',
+                    'not null' => TRUE,
+                    'unsigned' => TRUE,
+                ),
+                'time' => array(
+                    'description' => '(yyyy-mm-dd H:i:s).',
+                    'type' => 'varchar',
+                    'mysql_type' => 'DATETIME',
+                    'not null' => TRUE,
+                ),
+                'ip' => array(
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'default' => '',
+                ),
+                'message' => array(
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'default' => '',
+                ),
+            ),
+            'primary key' => array('id'),
+        );
+        return $schema;
+    }

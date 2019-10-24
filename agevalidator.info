@@ -1,0 +1,7 @@
+name = Age Validator
+description = Validates the age
+core = 7.x
+configure = admin/config/agevalidator
+package = custom
+
+dependencies[] = drupal:date

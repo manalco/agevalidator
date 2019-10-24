@@ -1,0 +1,146 @@
+<?php
+
+	function agevalidator_menu(){
+	  
+	  $items['validar-edad'] = array(
+	    'title' => 'Validar Edad',
+	    'page callback' => 'drupal_get_form',
+	    'page arguments'  => array('agevalidator_validar_edad_form'),
+	    'access callback' => true,
+	  );
+
+	  $items['admin/config/agevalidator'] = array(
+	    'title' => 'Validar Edad',
+	    'page callback' => 'drupal_get_form',
+	    'page arguments'  => array('agevalidator_config_form'),
+	    'access callback' => true,
+	  );
+
+	  return $items;
+	}
+
+	function agevalidator_preprocess_html($variables){
+		$allowed_urls = variable_get('agevalidator_allowed_urls', array());
+		$allowed_urls[] = '/validar-edad';
+		if(!in_array(request_uri(), $allowed_urls)){
+			$_SESSION['agevalidator_requested_uri'] = request_uri();
+			if(!isset($_SESSION['age']) || (isset($_SESSION['age']) && $_SESSION['age'] == false)){
+				drupal_goto('/validar-edad');
+			}
+		}
+	}
+
+	function agevalidator_store_log($message){
+		db_insert('agevalidator_log')
+			->fields(array(
+				'time' => date('Y-m-d H:i:s', strtotime('now')),
+				'message' => $message,
+				'ip' => ip_address()
+			))
+		->execute();
+	}
+
+	//Begin Forms
+	function agevalidator_validar_edad_form($form, &$form_state){
+		$form['birthday'] = array(
+			'#title' => 'Fecha de Nacimiento',
+			'#type' => 'date',
+		);
+
+		$form['submit'] = array(
+			'#type' => 'submit',
+			'#value' => 'Validar',
+		);
+
+		return $form;
+	}
+
+	function agevalidator_validar_edad_form_submit($form, &$form_state){
+		$min = strtotime(date('Y-m-d', strtotime('now - 18 years')));
+		$age = strtotime(date('Y-m-d', strtotime($form_state['values']['birthday']['year'].'-'.$form_state['values']['birthday']['month'].'-'.$form_state['values']['birthday']['day'])));
+
+		if($age > $min){
+			// User is not 18+
+			agevalidator_store_log('User age verified: ERROR, User is not 18+');
+			drupal_goto(variable_get('agevalidator_redirect', '/'));
+		}else{
+			// User is 18+
+			agevalidator_store_log('User age verified: Success');
+			$_SESSION['age'] = true;
+			drupal_goto($_SESSION['agevalidator_requested_uri']);
+		}
+	}
+
+	function agevalidator_config_form($form, &$form_state){
+		$form['log'] = array(
+			'#type' => 'item',
+			'#markup' => '<a href="/admin/config/agevalidator/log" style="float: right">Ver log</a>',
+			'#description' => '<p>Usar leading slash (/)</p><p>Agregar una nueva URL Permitida crea un nuevo campo.</p>',
+		);
+
+		$form['redirect'] = array(
+			'#type' => 'textfield',
+			'#title' => 'URL para redirección a menores',
+			'#description' => '<p>Se redirige al usuario a esta URL cuando el usuario es menor de 18 años. Si está vacío se redirigirá al index.</p><p>Ejemplos: <ul><li>/</li><li>/node</li><li>http://www.dominio.com</li></ul></p>',
+			'#default_value' => variable_get('agevalidator_redirect', ''),
+		);
+
+		$form['urls_title'] = array(
+			'#type' => 'item',
+			'#markup' => '<hr><h2>URL Permitidas</h2>',
+			'#description' => '<p>Usar leading slash (/)</p><p>Agregar una nueva URL Permitida crea un nuevo campo.</p>',
+		);
+
+		$allowed_urls = variable_get('agevalidator_allowed_urls', array());
+
+		foreach ($allowed_urls as $key => $value) {
+			$form['url_'.$key] = array(
+				'#type' => 'textfield',
+				'#title' => 'URL Permitida',
+				'#default_value' => $value,
+			);
+		}
+
+		$form['url_'.strval(sizeof($allowed_urls)+1)] = array(
+			'#type' => 'textfield',
+			'#title' => 'URL Permitida'
+		);
+
+		$form['submit'] = array(
+			'#type' => 'submit',
+			'#value' => 'Guardar'
+		);
+
+		$html = "<table><thead><td>ID</td><td>Hora</td><td>IP</td><td>Mensaje</td></thead><tbody>";
+
+		$log = db_query("SELECT * FROM agevalidator_log")->fetchAll();
+		foreach ($log as $key => $value) {
+			$html .= "<tr><td>".$value->id."</td><td>".$value->time."</td><td>".$value->ip."</td><td>".$value->message."</td></tr>";
+		}
+
+		$html .= "</tbody></table>";
+
+		$form['log'] = array(
+			'#type' => 'item',
+			'#markup' => '<hr><h2>LOG</h2>'.$html,
+			'#weight' => 100
+		);
+
+		return $form;
+	}
+	function agevalidator_config_form_submit($form, &$form_state){
+		$allowed_urls = array();
+		if($form_state['values']['redirect'] == ''){
+			variable_del('agevalidator_redirect');
+		}else{
+			variable_set('agevalidator_redirect', $form_state['values']['redirect']);
+		}
+
+		foreach ($form_state['values'] as $key => $value) {
+			if($value != '' && substr($key, 0,4) == 'url_'){
+				$allowed_urls[$key] = $value;
+			}
+		}
+
+		variable_set('agevalidator_allowed_urls', $allowed_urls);
+	}
