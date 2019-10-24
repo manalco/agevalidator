@@ -22,6 +22,7 @@
 	function agevalidator_preprocess_html($variables){
 		$allowed_urls = variable_get('agevalidator_allowed_urls', array());
 		$allowed_urls[] = '/validar-edad';
+		$allowed_urls[] = variable_get('agevalidator_redirect', '/');
 		if(!in_array(request_uri(), $allowed_urls)){
 			$_SESSION['agevalidator_requested_uri'] = request_uri();
 			if(!isset($_SESSION['age']) || (isset($_SESSION['age']) && $_SESSION['age'] == false)){
